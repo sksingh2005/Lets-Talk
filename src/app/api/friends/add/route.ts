@@ -9,9 +9,10 @@ import { z } from 'zod'
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-
-    const { email: emailToAdd } = addFriendValidator.parse(body.email)
+    const body = await req.json();
+    console.log("Received Request Body:", body); // Log incoming request
+    const { email: emailToAdd } = addFriendValidator.parse(body)
+    console.log("Parsed Email:", emailToAdd); // Log parsed email
 
     const idToAdd = (await fetchRedis(
       'get',
@@ -71,6 +72,8 @@ export async function POST(req: Request) {
 
     return new Response('OK')
   } catch (error) {
+    console.error("Error:", error); // Log the exact error
+
     if (error instanceof z.ZodError) {
       return new Response('Invalid request payload', { status: 422 })
     }
