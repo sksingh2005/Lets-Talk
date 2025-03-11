@@ -21,9 +21,7 @@ A project to learn modern full-stack development made by Josh.
 
 
 
-## Acknowledgements
 
-- [Awesome Button UI Component](https://ui.shadcn.com/)
 
 ## Feedback
 
