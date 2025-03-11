@@ -10,8 +10,12 @@ import { getServerSession } from 'next-auth'
 export async function POST(req: Request) {
   try {
     const { text, chatId }: { text: string; chatId: string } = await req.json()
-    const session = await getServerSession(authOptions)
 
+    if (!text || !chatId) {
+      return new Response('Invalid request body', { status: 400 })
+    }
+
+    const session = await getServerSession(authOptions)
     if (!session) return new Response('Unauthorized', { status: 401 })
 
     const [userId1, userId2] = chatId.split('--')
@@ -22,20 +26,22 @@ export async function POST(req: Request) {
 
     const friendId = session.user.id === userId1 ? userId2 : userId1
 
+    // ✅ Check friendship
     const friendList = (await fetchRedis(
       'smembers',
       `user:${session.user.id}:friends`
     )) as string[]
-    const isFriend = friendList.includes(friendId)
-
-    if (!isFriend) {
+    if (!friendList.includes(friendId)) {
       return new Response('Unauthorized', { status: 401 })
     }
 
+    // ✅ Get sender info
     const rawSender = (await fetchRedis(
       'get',
       `user:${session.user.id}`
     )) as string
+    if (!rawSender) return new Response('Sender not found', { status: 404 })
+
     const sender = JSON.parse(rawSender) as User
 
     const timestamp = Date.now()
@@ -49,16 +55,20 @@ export async function POST(req: Request) {
 
     const message = messageValidator.parse(messageData)
 
-    // notify all connected chat room clients
-    await pusherServer.trigger(toPusherKey(`chat:${chatId}`), 'incoming-message', message)
+    // ✅ Notify connected clients
+    try {
+      await pusherServer.trigger(toPusherKey(`chat:${chatId}`), 'incoming-message', message)
+      await pusherServer.trigger(toPusherKey(`user:${friendId}:chats`), 'new_message', {
+        ...message,
+        senderImg: sender.image,
+        senderName: sender.name,
+      })
+    } catch (pusherError) {
+      console.error('Pusher error:', pusherError)
+      return new Response('Failed to send message', { status: 500 })
+    }
 
-    await pusherServer.trigger(toPusherKey(`user:${friendId}:chats`), 'new_message', {
-      ...message,
-      senderImg: sender.image,
-      senderName: sender.name
-    })
-
-    // all valid, send the message
+    // ✅ Store message in Redis
     await db.zadd(`chat:${chatId}:messages`, {
       score: timestamp,
       member: JSON.stringify(message),
@@ -66,6 +76,8 @@ export async function POST(req: Request) {
 
     return new Response('OK')
   } catch (error) {
+    console.error('Error in message sending:', error)
+
     if (error instanceof Error) {
       return new Response(error.message, { status: 500 })
     }
@@ -73,3 +85,4 @@ export async function POST(req: Request) {
     return new Response('Internal Server Error', { status: 500 })
   }
 }
+
