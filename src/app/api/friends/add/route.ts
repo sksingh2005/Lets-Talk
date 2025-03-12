@@ -1,5 +1,6 @@
 import { fetchRedis } from '@/helpers/redis'
 import { authOptions } from '@/lib/auth'
+import cors, { runMiddleware } from '@/lib/cors'
 import { db } from '@/lib/db'
 import { pusherServer } from '@/lib/pusher'
 import { toPusherKey } from '@/lib/utils'
@@ -9,6 +10,8 @@ import { z } from 'zod'
 
 export async function POST(req: Request) {
   try {
+    await runMiddleware(req, new Response(), cors)
+
     const body = await req.json();
     console.log("Received Request Body:", body); // Log incoming request
     const { email: emailToAdd } = addFriendValidator.parse(body)
