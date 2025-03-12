@@ -1,6 +1,5 @@
 import { fetchRedis } from '@/helpers/redis'
 import { authOptions } from '@/lib/auth'
-import cors, { runMiddleware } from '@/lib/cors'
 import { db } from '@/lib/db'
 import { pusherServer } from '@/lib/pusher'
 import { toPusherKey } from '@/lib/utils'
@@ -9,8 +8,18 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 
 export async function POST(req: Request) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*', // Or specific origins like 'https://whispr1.vercel.app'
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Credentials': 'true',
+      },
+    })
+  }
   try {
-    await runMiddleware(req, new Response(), cors)
 
     const body = await req.json();
     console.log("Received Request Body:", body); // Log incoming request
